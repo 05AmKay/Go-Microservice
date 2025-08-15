@@ -4,23 +4,23 @@ import (
 	"fmt"
 	"log"
 
-	errorfactory "example.com/api/internal/error"
-	"example.com/api/internal/middleware"
+	"example.com/api/internal/routes"
+	"example.com/api/internal/validation"
 	"example.com/api/pkg/database"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	r := gin.Default()
+	router := gin.Default()
 
-	r.Use(middleware.GlobalErrorMiddleware())
-
-	r.GET("/", func(c *gin.Context) {
-		c.Error(errorfactory.NewResourceNotFoundError("User", "username", "test", c.Request.URL.Path))
-	})
+	routes.RegisterRoutes(router)
 
 	fmt.Println("Setting up the database configuration...")
-	database.InitializeDatabase()
+	err := database.InitializeDatabase()
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+		return
+	}
 	fmt.Printf("Database connection established successfully")
 	db := database.GetDatabaseInstance().GetDB()
 	if db == nil {
@@ -28,7 +28,11 @@ func main() {
 	}
 	fmt.Printf("Database connection is ready to use. %T %v", db, db)
 
+	fmt.Println("Initializing the validator...")
+	validation.InitValidator()
+	fmt.Println("Validator initialized successfully.")
+
 	log.Println("Server starting on :8080")
-	log.Fatal(r.Run(":8080"))
+	log.Fatal(router.Run(":8080"))
 
 }

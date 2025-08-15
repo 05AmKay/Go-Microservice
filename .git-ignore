@@ -20,3 +20,7 @@ vendor/
 
 # Log files
 *.log
+
+# air files
+/tmp
+air_errors.log

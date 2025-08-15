@@ -3,13 +3,13 @@ package dto
 import "time"
 
 type ErrorResponseDto struct {
-	ApiPath      string    `json:"apiPath"`
-	ErrorMessage string    `json:"errorMessage"`
-	ErrorCode    int       `json:"errorCode"`
-	ErrorTime    time.Time `json:"errorTime"`
+	ApiPath      string    `json:"api_path"`
+	ErrorMessage any       `json:"error_message"`
+	ErrorCode    int       `json:"error_code"`
+	ErrorTime    time.Time `json:"time"`
 }
 
-func NewErrorResponseDto(apiPath, errorMessage string, errorCode int) *ErrorResponseDto {
+func NewErrorResponseDto(apiPath string, errorMessage any, errorCode int) *ErrorResponseDto {
 	return &ErrorResponseDto{
 		ApiPath:      apiPath,
 		ErrorMessage: errorMessage,
