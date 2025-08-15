@@ -19,20 +19,6 @@ type DatabaseFactory interface {
 	Connect(config *DBConfig) (*gorm.DB, error)
 }
 
-func GetDatabaseConnectionFromFactory(dbType DatabaseType, config *DBConfig) (*gorm.DB, error) {
-	switch dbType {
-	case Postgres:
-		return (&PostgresDatabaseImpl{}).Connect(config)
-	case MongoDB:
-		return (&MongoDBDatabaseImpl{}).Connect(config)
-	case MySQL:
-		return (&MySQLDatabaseImpl{}).Connect(config)
-	default:
-		return nil, fmt.Errorf("unsupported database type: %s", dbType)
-	}
-
-}
-
 type PostgresDatabaseImpl struct{}
 
 func (p *PostgresDatabaseImpl) Connect(config *DBConfig) (*gorm.DB, error) {
@@ -71,4 +57,18 @@ type MySQLDatabaseImpl struct{}
 
 func (m *MySQLDatabaseImpl) Connect(config *DBConfig) (*gorm.DB, error) {
 	return nil, fmt.Errorf("MySQL connection not implemented yet")
+}
+
+func GetDatabaseConnectionFromFactory(dbType DatabaseType, config *DBConfig) (*gorm.DB, error) {
+	switch dbType {
+	case Postgres:
+		return (&PostgresDatabaseImpl{}).Connect(config)
+	case MongoDB:
+		return (&MongoDBDatabaseImpl{}).Connect(config)
+	case MySQL:
+		return (&MySQLDatabaseImpl{}).Connect(config)
+	default:
+		return nil, fmt.Errorf("unsupported database type: %s", dbType)
+	}
+
 }

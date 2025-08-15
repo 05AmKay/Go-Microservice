@@ -1,11 +1,11 @@
 package dto
 
 type ResponseDto struct {
-	StatusCode    string `json:"statusCode"`
-	StatusMessage string `json:"statusMessage"`
+	StatusCode    int    `json:"status"`
+	StatusMessage string `json:"message"`
 }
 
-func NewResponseDto(statusCode, statusMessage string) *ResponseDto {
+func NewResponseDto(statusCode int, statusMessage string) *ResponseDto {
 	return &ResponseDto{
 		StatusCode:    statusCode,
 		StatusMessage: statusMessage,

@@ -39,7 +39,7 @@ func (d *DbInstance) GetDB() *gorm.DB {
 	return d.DB
 }
 
-func InitializeDatabase() {
+func InitializeDatabase() error {
 	configBuilder := NewDbConfigBuilder()
 	config, err := configBuilder.SetHost("localhost").
 		SetPort(5432).
@@ -49,17 +49,18 @@ func InitializeDatabase() {
 		Build()
 
 	if err != nil {
-		fmt.Println("Error building database config:", err)
-		return
+		return fmt.Errorf("error building database config: %w", err)
+
 	}
 	fmt.Printf("Database configuration built successfully: %v\n", config)
 
 	dbConn, err := GetDatabaseConnectionFromFactory(Postgres, config)
 	if err != nil {
-		fmt.Println("Error getting database connection from factory:", err)
-		return
+		return fmt.Errorf("error getting database connection from factory: %w", err)
+
 	}
 
 	dbInstance := GetDatabaseInstance()
 	dbInstance.SetDB(dbConn)
+	return nil
 }

@@ -20,13 +20,11 @@ func GlobalErrorMiddleware() gin.HandlerFunc {
 			log.Printf("An  error occured: %v", lastError)
 			var errorResponseDto *dto.ErrorResponseDto
 
-			if appErr, ok := errorfactory.IsAppError(lastError); ok {
+			if appErr, ok := lastError.(errorfactory.ApplicationError); ok {
 				errorResponseDto = appErr.ToErrorResponseDto()
 			} else {
-				appErr = errorfactory.NewAppError(
+				appErr = errorfactory.ThrowInternalServerError(
 					c.Request.URL.Path,
-					http.StatusText(http.StatusInternalServerError),
-					http.StatusInternalServerError,
 				)
 				errorResponseDto = appErr.ToErrorResponseDto()
 			}

@@ -1,7 +1,6 @@
 package errorfactory
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -9,71 +8,115 @@ import (
 	"example.com/api/internal/dto"
 )
 
-type AppError struct {
-	ApiPath      string    `json:"apiPath"`
-	ErrorMessage string    `json:"errorMessage"`
-	ErrorCode    int       `json:"errorCode"`
-	ErrorTime    time.Time `json:"errorTime"`
-	Err          error     `json:"-"`
+type ErrorType string
+
+const (
+	AppError                   ErrorType = "AppError"
+	ValidationError            ErrorType = "ValidationError"
+	ResourceNotFoundError      ErrorType = "ResourceNotFoundError"
+	CustomerAlreadyExistsError ErrorType = "CustomerAlreadyExistsError"
+)
+
+type ApplicationError interface {
+	error
+	UnWrap() error
+	Create(apiPath string, errorCode int, errorMessage any, cause ...error) ApplicationError
+	ToErrorResponseDto() *dto.ErrorResponseDto
 }
 
-func NewAppError(apiPath, errorMessage string, errorCode int) *AppError {
-	return &AppError{
-		ApiPath:      apiPath,
-		ErrorMessage: errorMessage,
-		ErrorCode:    errorCode,
-		ErrorTime:    time.Now(),
+type BaseError struct {
+	ApiPath   string    `json:"api_path"`
+	ErrorCode int       `json:"error_code"`
+	ErrorTime time.Time `json:"error_time"`
+	Err       error     `json:"-"`
+}
+type AppErrorImpl struct {
+	BaseError
+	ErrorMessage string `json:"error_message"`
+}
+
+// Add UnWrap() method implementation for AppErrorImpl
+func (ae *AppErrorImpl) UnWrap() error {
+	return ae.Err
+}
+
+// Add Error() method implementation for AppErrorImpl
+func (ae *AppErrorImpl) Error() string {
+	if ae.Err != nil {
+		return fmt.Sprintf("Path: %s, Code: %d, Message: %s, Wrapped Error: %s",
+			ae.ApiPath, ae.ErrorCode, ae.ErrorMessage, ae.Err.Error())
 	}
+	return fmt.Sprintf("Path: %s, Code: %d, Message: %s",
+		ae.ApiPath, ae.ErrorCode, ae.ErrorMessage)
 }
 
-func NewAppErrorWithCause(apiPath, errorMessage string, errorCode int, cause error) *AppError {
-	ae := NewAppError(apiPath, errorMessage, errorCode)
-	ae.Err = cause
+func (ae *AppErrorImpl) Create(apiPath string, errorCode int, errorMessage any, cause ...error) ApplicationError {
+	ae.ApiPath = apiPath
+	ae.ErrorCode = errorCode
+	ae.ErrorTime = time.Now()
+
+	if len(cause) > 0 {
+		ae.Err = cause[0]
+	}
+
+	if msg, ok := errorMessage.(string); ok {
+		ae.ErrorMessage = msg
+	}
 	return ae
 }
 
-func IsAppError(err error) (*AppError, bool) {
-	var appErr *AppError
-	if ok := errors.As(err, &appErr); ok {
-		return appErr, true
+func GetErrorTypeFromFactory(errorType ErrorType) (ApplicationError, error) {
+	switch errorType {
+	case AppError, ResourceNotFoundError, CustomerAlreadyExistsError:
+		return &AppErrorImpl{
+			BaseError: BaseError{},
+		}, nil
+	case ValidationError:
+		return &ValidationErrorImpl{
+			BaseError:     BaseError{},
+			ErrorMessages: []ValidationErrorDetail{},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported database type: %s", errorType)
 	}
-	return nil, false
 }
 
-// Unwrap implements the errors.Unwrapper interface, crucial for errors.Is and errors.As.
-func (e *AppError) Unwrap() error {
-	return e.Err
-}
-
-// Error implements the error interface for AppError.
-func (e *AppError) Error() string {
-	if e.Err != nil {
-		return fmt.Sprintf("Path: %s, Code: %d, Message: %s, Wrapped Error: %s", e.ApiPath, e.ErrorCode, e.ErrorMessage, e.Err.Error())
+func ThrowInternalServerError(apiPath string, cause ...error) ApplicationError {
+	errObj, err := GetErrorTypeFromFactory(AppError)
+	if err != nil {
+		appError, _ := GetErrorTypeFromFactory(AppError)
+		return appError.Create(
+			apiPath, http.StatusInternalServerError, "Internal error factory failure", cause...)
 	}
-	return fmt.Sprintf("Path: %s, Code: %d, Message: %s", e.ApiPath, e.ErrorCode, e.ErrorMessage)
+	return errObj.Create(apiPath, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), cause...)
 }
 
-func (ae *AppError) ToErrorResponseDto() *dto.ErrorResponseDto {
+func ThrowCustomError(apiPath string, errorCode int, errorMessage any, cause ...error) ApplicationError {
+	errObj, err := GetErrorTypeFromFactory(AppError)
+	if err != nil {
+		return ThrowInternalServerError(apiPath, cause...)
+	}
+	return errObj.Create(apiPath, errorCode, errorMessage, cause...)
+}
+
+func ThrowCustomerAlreadyExistError(email, apiPath string, cause ...error) ApplicationError {
+	errorMessage := fmt.Sprintf("Customer with email '%s' already exists", email)
+
+	errObj, err := GetErrorTypeFromFactory(CustomerAlreadyExistsError)
+
+	if err != nil {
+		return ThrowInternalServerError(apiPath, cause...)
+	}
+
+	return errObj.Create(apiPath, http.StatusConflict, errorMessage, cause...)
+}
+
+// Add ToErrorResponseDto() method implementation for AppErrorImpl
+func (ae *AppErrorImpl) ToErrorResponseDto() *dto.ErrorResponseDto {
 	return &dto.ErrorResponseDto{
 		ApiPath:      ae.ApiPath,
 		ErrorMessage: ae.ErrorMessage,
 		ErrorCode:    ae.ErrorCode,
 		ErrorTime:    ae.ErrorTime,
 	}
-}
-
-func NewResourceNotFoundError(resourceName, fieldName, fieldValue, apiPath string, cause ...error) *AppError {
-	errorMessage := fmt.Sprintf("%s not found with %s: %v", resourceName, fieldName, fieldValue)
-	if len(cause) > 0 {
-		return NewAppErrorWithCause(apiPath, errorMessage, http.StatusNotFound, cause[0])
-	}
-	return NewAppError(apiPath, errorMessage, http.StatusNotFound)
-}
-
-func CustomerAlreadyExistsError(email, apiPath string, cause ...error) *AppError {
-	errorMessage := fmt.Sprintf("Customer with email '%s' already exists", email)
-	if len(cause) > 0 {
-		return NewAppErrorWithCause(apiPath, errorMessage, http.StatusConflict, cause[0])
-	}
-	return NewAppError(apiPath, errorMessage, http.StatusConflict)
 }
