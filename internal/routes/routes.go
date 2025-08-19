@@ -7,6 +7,7 @@ import (
 
 func RegisterRoutes(router *gin.Engine) {
 
+	router.Use(middleware.RequestIdMiddleware())
 	router.Use(middleware.GlobalErrorMiddleware())
 
 	apiV1 := router.Group("/api/v1")
