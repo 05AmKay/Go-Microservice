@@ -4,13 +4,29 @@ import (
 	"fmt"
 	"log"
 
+	"example.com/api/internal/config"
 	"example.com/api/internal/routes"
 	"example.com/api/internal/validation"
 	"example.com/api/pkg/database"
+	"example.com/api/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
+func init() {
+	err := config.LoadAppConfig()
+	if err != nil {
+		log.Fatalf("Error loading environment variables: %v", err)
+	}
+
+	if err := logger.InitializeLogger(); err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+}
+
 func main() {
+	defer logger.Sync()
+	Config := config.GetConfig()
+
 	router := gin.Default()
 
 	routes.RegisterRoutes(router)
@@ -33,6 +49,5 @@ func main() {
 	fmt.Println("Validator initialized successfully.")
 
 	log.Println("Server starting on :8080")
-	log.Fatal(router.Run(":8080"))
-
+	log.Fatal(router.Run(":" + Config.AppConfig.Port))
 }

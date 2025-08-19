@@ -11,7 +11,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func ValidateCreateCustomerRequest(c *gin.Context, customerDto dto.CustomerDto) {
+func ValidateCreateCustomerRequest(c *gin.Context, customerDto dto.CustomerDto) error {
 	var validatorObj = GetValidator()
 
 	// returns nil or ValidationErrors ( []FieldError )
@@ -23,7 +23,7 @@ func ValidateCreateCustomerRequest(c *gin.Context, customerDto dto.CustomerDto) 
 		var invalidValidationError *validator.InvalidValidationError
 		if errors.As(err, &invalidValidationError) {
 			fmt.Println(err)
-			return
+			return fmt.Errorf("validation failed, invalid value for validation")
 		}
 
 		var validateErrs validator.ValidationErrors
@@ -47,27 +47,27 @@ func ValidateCreateCustomerRequest(c *gin.Context, customerDto dto.CustomerDto) 
 
 				errorMessages = append(errorMessages, errorDetail)
 
-				fmt.Println("Namespace: ", e.Namespace())
-				fmt.Println("Field: ", e.Field())
-				fmt.Println("StructNamespace: ", e.StructNamespace())
-				fmt.Println("StructField: ", e.StructField())
-				fmt.Println("Tag: ", e.Tag())
-				fmt.Println("ActualTag: ", e.ActualTag())
-				fmt.Println("Kind: ", e.Kind())
-				fmt.Println("Typee: ", e.Type())
-				fmt.Println("Value: ", e.Value())
-				fmt.Println("Param: ", e.Param())
-				fmt.Println()
+				// fmt.Println("Namespace: ", e.Namespace())
+				// fmt.Println("Field: ", e.Field())
+				// fmt.Println("StructNamespace: ", e.StructNamespace())
+				// fmt.Println("StructField: ", e.StructField())
+				// fmt.Println("Tag: ", e.Tag())
+				// fmt.Println("ActualTag: ", e.ActualTag())
+				// fmt.Println("Kind: ", e.Kind())
+				// fmt.Println("Typee: ", e.Type())
+				// fmt.Println("Value: ", e.Value())
+				// fmt.Println("Param: ", e.Param())
+				// fmt.Println()
 			}
 			fmt.Println("Validation errors:", errorMessages)
-			c.Error(errorfactory.ThrowValidationError(
+			c.AbortWithStatusJSON(http.StatusBadRequest, errorfactory.ThrowValidationError(
 				c.Request.URL.Path,
 				errorMessages,
 				http.StatusBadRequest,
-			))
-			return
+			).ToErrorResponseDto())
+			return fmt.Errorf("validation failed")
 		}
 
 	}
-
+	return nil
 }

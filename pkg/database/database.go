@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"example.com/api/internal/config"
 	"gorm.io/gorm"
 )
 
@@ -41,11 +42,12 @@ func (d *DbInstance) GetDB() *gorm.DB {
 
 func InitializeDatabase() error {
 	configBuilder := NewDbConfigBuilder()
-	config, err := configBuilder.SetHost("localhost").
-		SetPort(5432).
-		SetCredentials("postgres", "password").
-		SetDatabase("postgres").
-		SetSSL(false).
+	dbConfig := config.GetConfig().AppConfig.DBConfig
+	config, err := configBuilder.SetHost(dbConfig.Host).
+		SetPort(dbConfig.Port).
+		SetCredentials(dbConfig.User, dbConfig.Password).
+		SetDatabase(dbConfig.Database).
+		SetSSL(dbConfig.SSL).
 		Build()
 
 	if err != nil {
