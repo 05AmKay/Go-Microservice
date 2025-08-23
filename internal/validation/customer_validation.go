@@ -3,19 +3,45 @@ package validation
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
-	"example.com/api/internal/dto"
 	errorfactory "example.com/api/internal/error"
+	exceptions "example.com/api/internal/exception"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
 
-func ValidateCreateCustomerRequest(c *gin.Context, customerDto dto.CustomerDto) error {
+func formatValidationErrorMessages(e validator.FieldError) errorfactory.ValidationErrorDetail {
+	errorDetail := errorfactory.ValidationErrorDetail{
+		Field: e.Field(),
+	}
+
+	switch e.Tag() {
+	case "required":
+		errorDetail.Error = fmt.Sprintf("Field '%s' is missing", e.Field())
+	case "email":
+		errorDetail.Error = fmt.Sprintf("Field '%s' must be a valid email", e.Field())
+	case "gt":
+		errorDetail.Error = fmt.Sprintf("Field '%s' must be greater than %s", e.Field(), e.Param())
+	case "lt":
+		errorDetail.Error = fmt.Sprintf("Field '%s' must be less than %s", e.Field(), e.Param())
+	case "min":
+		errorDetail.Error = fmt.Sprintf("Field '%s' must be at least %s characters long", e.Field(), e.Param())
+	case "max":
+		errorDetail.Error = fmt.Sprintf("Field '%s' must be at most %s characters long", e.Field(), e.Param())
+	case "oneof":
+		errorDetail.Error = fmt.Sprintf("Field '%s' must be one of the following values: %s", e.Field(), e.Param())
+	case "gte":
+		errorDetail.Error = fmt.Sprintf("Field '%s' must be greater than or equal to %s", e.Field(), e.Param())
+	}
+
+	return errorDetail
+}
+
+func ValidateCreateCustomerRequest(c *gin.Context, anyDto any) error {
 	var validatorObj = GetValidator()
 
 	// returns nil or ValidationErrors ( []FieldError )
-	err := validatorObj.Struct(customerDto)
+	err := validatorObj.Struct(anyDto)
 	if err != nil {
 		// this check is only needed when your code could produce
 		// an invalid value for validation such as interface with nil
@@ -30,21 +56,7 @@ func ValidateCreateCustomerRequest(c *gin.Context, customerDto dto.CustomerDto) 
 		if errors.As(err, &validateErrs) {
 			errorMessages := make([]errorfactory.ValidationErrorDetail, 0)
 			for _, e := range validateErrs {
-				errorDetail := errorfactory.ValidationErrorDetail{
-					Field: e.Field(),
-				}
-				switch e.Tag() {
-				case "required":
-					errorDetail.Error =
-						fmt.Sprintf("Field '%s' is missing", e.Field())
-				case "email":
-					errorDetail.Error =
-						fmt.Sprintf("Field '%s' must be a valid email", e.Field())
-				case "gte":
-					errorDetail.Error =
-						fmt.Sprintf("Field '%s' must be greater than or equal to %s", e.Field(), e.Param())
-				}
-
+				errorDetail := formatValidationErrorMessages(e)
 				errorMessages = append(errorMessages, errorDetail)
 
 				// fmt.Println("Namespace: ", e.Namespace())
@@ -60,11 +72,7 @@ func ValidateCreateCustomerRequest(c *gin.Context, customerDto dto.CustomerDto) 
 				// fmt.Println()
 			}
 			fmt.Println("Validation errors:", errorMessages)
-			c.AbortWithStatusJSON(http.StatusBadRequest, errorfactory.ThrowValidationError(
-				c.Request.URL.Path,
-				errorMessages,
-				http.StatusBadRequest,
-			).ToErrorResponseDto())
+			exceptions.ThrowValidationException(c, errorMessages)
 			return fmt.Errorf("validation failed")
 		}
 
