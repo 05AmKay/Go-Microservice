@@ -81,7 +81,7 @@ func GetErrorTypeFromFactory(errorType ErrorType) (ApplicationError, error) {
 	}
 }
 
-func ThrowInternalServerError(apiPath string, cause ...error) ApplicationError {
+func CreateInternalServerError(apiPath string, cause ...error) ApplicationError {
 	errObj, err := GetErrorTypeFromFactory(AppError)
 	if err != nil {
 		appError, _ := GetErrorTypeFromFactory(AppError)
@@ -91,21 +91,20 @@ func ThrowInternalServerError(apiPath string, cause ...error) ApplicationError {
 	return errObj.Create(apiPath, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), cause...)
 }
 
-func ThrowCustomError(apiPath string, errorCode int, errorMessage any, cause ...error) ApplicationError {
+func CreateCustomError(apiPath string, errorCode int, errorMessage any, cause ...error) ApplicationError {
 	errObj, err := GetErrorTypeFromFactory(AppError)
 	if err != nil {
-		return ThrowInternalServerError(apiPath, cause...)
+		return CreateInternalServerError(apiPath, cause...)
 	}
 	return errObj.Create(apiPath, errorCode, errorMessage, cause...)
 }
 
-func ThrowCustomerAlreadyExistError(email, apiPath string, cause ...error) ApplicationError {
-	errorMessage := fmt.Sprintf("Customer with email '%s' already exists", email)
+func CreateCustomerAlreadyExistError(apiPath, errorMessage string, cause ...error) ApplicationError {
 
 	errObj, err := GetErrorTypeFromFactory(CustomerAlreadyExistsError)
 
 	if err != nil {
-		return ThrowInternalServerError(apiPath, cause...)
+		return CreateInternalServerError(apiPath, cause...)
 	}
 
 	return errObj.Create(apiPath, http.StatusConflict, errorMessage, cause...)

@@ -1,10 +1,16 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"example.com/api/internal/config"
+	"example.com/api/internal/models"
 	"example.com/api/internal/routes"
 	"example.com/api/internal/validation"
 	"example.com/api/pkg/database"
@@ -31,23 +37,63 @@ func main() {
 
 	routes.RegisterRoutes(router)
 
-	fmt.Println("Setting up the database configuration...")
+	logger.Sugar.Infof("Setting up the database configuration...")
 	err := database.InitializeDatabase()
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		logger.Sugar.Fatalf("Failed to initialize database: %v", err)
 		return
 	}
-	fmt.Printf("Database connection established successfully")
+	logger.Sugar.Infof("Database connection established successfully")
+
 	db := database.GetDatabaseInstance().GetDB()
 	if db == nil {
-		fmt.Println("Database connection is nil, initialization failed.")
+		logger.Sugar.Fatalf("Database connection is nil, initialization failed")
 	}
-	fmt.Printf("Database connection is ready to use. %T %v", db, db)
+	logger.Sugar.Infof("Database connection is ready to use. %T %v", db, db)
 
-	fmt.Println("Initializing the validator...")
+	dbModels := models.GetModels()
+	if err := db.AutoMigrate(dbModels...); err != nil {
+		logger.Sugar.Fatalf("failed to automigrate: %v", err)
+	}
+	logger.Sugar.Infof("Database table migration done successfully")
+
+	logger.Sugar.Infof("Initializing the validator...")
 	validation.InitValidator()
-	fmt.Println("Validator initialized successfully.")
+	logger.Sugar.Infof("Validator initialized successfully")
 
-	log.Println("Server starting on :8080")
-	log.Fatal(router.Run(":" + Config.AppConfig.Port))
+	// Create server
+	srv := &http.Server{
+		Addr:    ":" + Config.AppConfig.Port,
+		Handler: router,
+	}
+
+	// Graceful shutdown setup (create a goroutine to start server and listen for shutdown signals later)
+	go func() {
+		logger.Sugar.Infof("Started server on port: %s", Config.AppConfig.Port)
+		// Listen and serve
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Starting server failed: %s\n", err)
+		}
+	}()
+
+	// Create a channerl to Wait for shutdown signal from goroutine
+	quit := make(chan os.Signal, 1)
+
+	// OS will notify the channel when an interrupt or terminate signal is received
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Block the main goroutine until an interrupt or terminate signal is received
+	<-quit
+	logger.Sugar.Info("Shutdown Server ...")
+
+	// The context is used to inform the server it has 5 seconds to finish
+	// the request it is currently handling
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Sugar.Info("Server forced to shutdown:", err)
+		log.Fatalf("Forced shutdown: %s\n", err)
+	}
+	logger.Sugar.Info("Server exiting")
 }

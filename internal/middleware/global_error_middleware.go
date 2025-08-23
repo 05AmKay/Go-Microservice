@@ -23,7 +23,7 @@ func GlobalErrorMiddleware() gin.HandlerFunc {
 			if appErr, ok := lastError.(errorfactory.ApplicationError); ok {
 				errorResponseDto = appErr.ToErrorResponseDto()
 			} else {
-				appErr = errorfactory.ThrowInternalServerError(
+				appErr = errorfactory.CreateInternalServerError(
 					c.Request.URL.Path,
 				)
 				errorResponseDto = appErr.ToErrorResponseDto()

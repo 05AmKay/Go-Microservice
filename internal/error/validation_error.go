@@ -47,10 +47,10 @@ func (ve *ValidationErrorImpl) Create(apiPath string, errorCode int, errorMessag
 	return ve
 }
 
-func ThrowValidationError(apiPath string, errorMessage any, errorCode int, cause ...error) ApplicationError {
+func CreateValidationError(apiPath string, errorMessage any, cause ...error) ApplicationError {
 	errObj, err := GetErrorTypeFromFactory(ValidationError)
 	if err != nil {
-		return ThrowInternalServerError(apiPath, cause...)
+		return CreateInternalServerError(apiPath, cause...)
 	}
 
 	return errObj.Create(apiPath, http.StatusBadRequest, errorMessage, cause...)
